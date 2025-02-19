@@ -28,9 +28,9 @@ class PositionalEncodings(nn.Module):
             # div matrix of size(d_model, 1)(denominator term of the formula)
             div = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
             # to even indices
-            pe[0::2] = torch.sin(pos*div) # sin(position * (10000 ** (2i / d_model))
+            pe[:,0::2] = torch.sin(pos*div) # sin(position * (10000 ** (2i / d_model))
             # to odd indices
-            pe[1::2] = torch.cos(pos*div) # cos(position * (10000 ** (2i / d_model))
+            pe[:,1::2] = torch.cos(pos*div) # cos(position * (10000 ** (2i / d_model))
             # Add a batch dimension to the positional encoding
             pe = pe.unsqueeze(0) # (1, seq_len, d_model)
             # registering the pe matrix to buffer cause we dont want any learning on it, it will stay the same for every batch
@@ -42,7 +42,7 @@ class PositionalEncodings(nn.Module):
 
 # layer normalization
 class LayerNormalization(nn.Module):
-    def __init__(self, d_model:int, eps:float = 1e**4):
+    def __init__(self, d_model:int, eps:float = 1e4):
         super().__init__()
         self.d_model = d_model
         self.eps = eps
@@ -152,12 +152,13 @@ class EncoderBlock(nn.Module):
 # encoder containing all the no of encoder blocks
 class Encoder(nn.Module):
 
-    def __init__(self, features:int, layers:nn.ModuleList):
+    def __init__(self, features: int, layers: nn.ModuleList) -> None:
+        super().__init__() # Call super().__init__() FIRST
         self.layers = layers
         self.norm = LayerNormalization(features)
 
     def forward(self, x, mask):
-        for layer in self.layers(x):
+        for layer in self.layers:
             x = layer(x,mask) # updating the x
         return self.norm(x)
 
@@ -181,7 +182,7 @@ class DecoderBlock(nn.Module):
 class Decoder(nn.Module):
 
     def __init__(self, features: int, layers: nn.ModuleList) -> None:
-        super().__init__()
+        super().__init__() # Call super().__init__() FIRST
         self.layers = layers
         self.norm = LayerNormalization(features)
 
@@ -253,7 +254,7 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
         decoder_self_attention_block = MultiHeadAttentionBlock(h, d_model, dropout)
         decoder_cross_attention_block = MultiHeadAttentionBlock(h, d_model, dropout)
         decoder_feed_forward = FeedForwardBlock(d_model, d_ff, dropout)
-        decoder_block = DecoderBlock(d_model, decoder_self_attention_block, decoder_cross_attention_block, encoder_feed_forward, dropout)
+        decoder_block = DecoderBlock(d_model, decoder_self_attention_block, decoder_cross_attention_block, decoder_feed_forward, dropout)
         decoder_blocks.append(decoder_block)
 
     # Creating the encoder and decoder

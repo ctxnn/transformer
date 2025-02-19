@@ -1,4 +1,3 @@
-from pandas.core.generic import dt
 import torch
 from torch.cuda import initial_seed
 import torch.nn as nn
@@ -96,7 +95,7 @@ def get_all_sentences(ds, lang):
         yield item['translation'][lang]
 
 def get_or_build_tokenizer(config, ds, lang):
-    tokenizer_path = Path(config['tokenizer_path'].format(lang))
+    tokenizer_path = Path(config['tokenizer_file'].format(lang))
 
     if not tokenizer_path.exists():  # Correct path check
         tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
@@ -214,9 +213,10 @@ def train_model(config):
             optimizer.step()
             optimizer.zero_grad()
             
-            run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
+            
             
             global_step += 1
+        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
             
         # Save the model
         model_filename = get_weights_file_path(config, f'{epoch:0.2d}')

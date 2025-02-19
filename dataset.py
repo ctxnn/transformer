@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
 
 class BilingualDataset(Dataset):
 
@@ -31,17 +34,17 @@ class BilingualDataset(Dataset):
         tgt_encodings = self.tokenizer_tgt.encode(tgt_text).ids
 
         enc_num_padding_tokens = self.seq_len - len(src_encodings) - 2 # -2 for sos and eos tokens
-        dec_num_padding_tokens = self.seq_len - len(tgt_encodings) - 1 # -1 for eos token
+        dec_num_padding_tokens = self.seq_len - len(tgt_encodings) - 2 # -2 for sos and eos tokens
 
         if enc_num_padding_tokens < 0 or dec_num_padding_tokens < 0:
-            return ValueError("Sequence length is too short")
+            raise ValueError("Sequence length is too short")
 
         # add sos and eos to the source text and pad it
         encoder_input = torch.cat([
                                    self.sos_token,
                                    torch.Tensor(src_encodings),
                                    self.eos_token,
-                                   torch.Tensor([self.pad_token]) * enc_num_padding_tokens
+                                   self.pad_token.repeat(enc_num_padding_tokens)
             ]
         ).long()
 
@@ -49,7 +52,7 @@ class BilingualDataset(Dataset):
         decoder_input = torch.cat([
                                       self.sos_token,
                                       torch.Tensor(tgt_encodings),
-                                      torch.Tensor([self.pad_token]) * dec_num_padding_tokens
+                                      self.pad_token.repeat(dec_num_padding_tokens)
                 ]
           ).long()
 
@@ -57,7 +60,7 @@ class BilingualDataset(Dataset):
         label = torch.cat([
                                 torch.Tensor(tgt_encodings),
                                 self.eos_token,
-                                torch.Tensor([self.pad_token]) * dec_num_padding_tokens
+                                self.pad_token.repeat(dec_num_padding_tokens)
                 ]
             ).long()
 
