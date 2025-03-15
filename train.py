@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 import torchmetrics
 
+from dataset import get_ds
 from model import build_transformer
 from dataset import BilingualDataset, causal_mask
 from config import get_weights_file_path, get_config, latest_weights_file_path
@@ -235,17 +236,20 @@ def train_model(config):
             writer
         )
         
-        # Save checkpoint
-        model_filename = get_weights_file_path(config, f"{epoch:02d}")
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict(),
-            'global_step': global_step,
-            'val_bleu': val_bleu
-        }, model_filename)
+    # Save checkpoint
+    model_filename = get_weights_file_path(config, f"{epoch:02d}")
 
+    # Ensure the directory exists before saving
+    os.makedirs(os.path.dirname(model_filename), exist_ok=True)
+
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict(),
+        'global_step': global_step,
+        'val_bleu': val_bleu
+    }, model_filename)
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     config = get_config()
