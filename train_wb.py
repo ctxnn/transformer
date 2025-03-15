@@ -331,6 +331,36 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
     model = build_transformer(vocab_src_len, vocab_tgt_len, config["seq_len"], config['seq_len'], d_model=config['d_model'])
     return model
 
+def get_latest_checkpoint(folder_path):
+    """Get the latest checkpoint file from the given folder."""
+    import os
+    import glob
+    
+    # Ensure the folder exists
+    if not os.path.exists(folder_path):
+        print(f"Warning: Checkpoint folder {folder_path} does not exist.")
+        return None
+    
+    # Get all weight files
+    weight_files = glob.glob(os.path.join(folder_path, "*.pt"))
+    
+    if not weight_files:
+        print(f"Warning: No checkpoint files found in {folder_path}")
+        return None
+    
+    # Sort by modification time (latest first)
+    latest_file = max(weight_files, key=os.path.getmtime)
+    
+    # Extract just the epoch number from the filename
+    import re
+    match = re.search(r'(\d+)\.pt$', latest_file)
+    if match:
+        epoch_number = match.group(1)
+        return epoch_number
+    
+    # If we can't extract the epoch number, return the full filename
+    return os.path.basename(latest_file)
+
 def train_model(config):
     # Define the device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -338,6 +368,13 @@ def train_model(config):
 
     # Make sure the weights folder exists
     Path(config['model_folder']).mkdir(parents=True, exist_ok=True)
+
+    # Hardcode checkpoint folder and find the latest file
+    checkpoint_folder = "/teamspace/studios/this_studio/transformer/weights"
+    latest_checkpoint = get_latest_checkpoint(checkpoint_folder)
+    if latest_checkpoint:
+        config['preload'] = latest_checkpoint
+        print(f"Automatically loading latest checkpoint: {latest_checkpoint}")
 
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(config)
     model = get_model(config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()).to(device)
