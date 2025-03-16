@@ -2,14 +2,11 @@ import torch
 import gradio as gr
 from pathlib import Path
 import os
-import argparse
 
 from model import build_transformer
 from dataset import causal_mask
 from config import get_config, latest_weights_file_path
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
-from tokenizers.pre_tokenizers import Whitespace
 
 def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
     sos_idx = tokenizer_tgt.token_to_id('[SOS]')
@@ -41,68 +38,16 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
 
     return decoder_input.squeeze(0)
 
-def create_dummy_tokenizer(vocab_size=1000):
-    """Create a simple tokenizer for demo purposes"""
-    tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
-    tokenizer.pre_tokenizer = Whitespace()
-    
-    # Create a basic vocabulary
-    vocab = {"[PAD]": 0, "[UNK]": 1, "[SOS]": 2, "[EOS]": 3}
-    
-    # Add some common words to the vocabulary
-    common_words = [
-        "the", "be", "to", "of", "and", "a", "in", "that", "have", "I", 
-        "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-        "hello", "world", "machine", "learning", "translation", "model", "transformer",
-        "language", "processing", "natural", "artificial", "intelligence", "neural", "network"
-    ]
-    
-    for i, word in enumerate(common_words, start=len(vocab)):
-        vocab[word] = i
-    
-    # Fill the rest with dummy tokens
-    for i in range(len(vocab), vocab_size):
-        vocab[f"token{i}"] = i
-    
-    tokenizer.model = WordLevel(vocab, unk_token="[UNK]")
-    return tokenizer
-
-def translate(input_text, use_demo_mode=True):
-    """Translate text using either a trained model or a demo model"""
+def translate(input_text):
     # Load the configuration
     config = get_config()
     
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    if use_demo_mode:
-        # Create dummy tokenizers for demo
-        tokenizer_src = create_dummy_tokenizer()
-        tokenizer_tgt = create_dummy_tokenizer()
-        
-        # Create a dummy model
-        model = build_transformer(
-            tokenizer_src.get_vocab_size(),
-            tokenizer_tgt.get_vocab_size(),
-            config['seq_len'],
-            config['seq_len'],
-            d_model=config['d_model']
-        ).to(device)
-        
-        # For demo mode, just return a predefined response
-        return f"[DEMO MODE] Translation of: '{input_text}'\n\nCiao, questa è una traduzione di esempio. Il modello reale non è stato caricato."
-    
-    # For real model mode:
-    # Check if tokenizers exist
-    tokenizer_src_path = Path(config['tokenizer_file'].format(config['lang_src']))
-    tokenizer_tgt_path = Path(config['tokenizer_file'].format(config['lang_tgt']))
-    
-    if not tokenizer_src_path.exists() or not tokenizer_tgt_path.exists():
-        return "Tokenizer files not found. Please run the training script first to generate tokenizers, or use demo mode."
-    
     # Load tokenizers
-    tokenizer_src = Tokenizer.from_file(str(tokenizer_src_path))
-    tokenizer_tgt = Tokenizer.from_file(str(tokenizer_tgt_path))
+    tokenizer_src = Tokenizer.from_file(str(Path(config['tokenizer_file'].format(config['lang_src']))))
+    tokenizer_tgt = Tokenizer.from_file(str(Path(config['tokenizer_file'].format(config['lang_tgt']))))
     
     # Load the model
     model_path = latest_weights_file_path(config)
@@ -177,30 +122,33 @@ def translate(input_text, use_demo_mode=True):
     
     return translation
 
-# Create Gradio interface
-demo = gr.Interface(
-    fn=lambda text: translate(text, use_demo_mode=True),  # Always use demo mode for Hugging Face Space
-    inputs=gr.Textbox(
-        lines=5, 
-        placeholder="Enter English text to translate to Italian...",
-        label="English Text"
-    ),
-    outputs=gr.Textbox(label="Italian Translation"),
-    title="English to Italian Transformer Translation",
-    description=("This app uses a Transformer model to translate English text to Italian. "
-                "⚠️ *Translation Disclaimer* ⚠️\n\n"
-                "🔥 Warning: This translator might occasionally confuse 'pasta' with 'post office' due to limited GPU training. 🔥\n"
-                "Our model was trained on a GPU that was sweating harder than an Italian chef in a hot kitchen! 🍝💦\n"
-                "If your translation sounds like it was done by a tourist with a phrasebook and three espressos, that's why! 😂\n"
-                "We promise it's not the algorithm's fault - it's just dreaming of better cooling fans and more VRAM! 🌬️💾\n\n"
-                "Note: This is running in demo mode for Hugging Face Spaces. For full functionality, clone the repository and run locally."),
-    examples=[
-        ["Hello, how are you today?"],
-        ["I love machine learning and natural language processing."],
-        ["The weather is beautiful today."]
-    ]
-)
+def main():
+    # Create Gradio interface
+    demo = gr.Interface(
+        fn=translate,
+        inputs=gr.Textbox(
+            lines=5, 
+            placeholder="Enter English text to translate to Italian...",
+            label="English Text"
+        ),
+        outputs=gr.Textbox(label="Italian Translation"),
+        title="English to Italian Transformer Translation",
+        description=("This app uses a Transformer model to translate English text to Italian. "
+                    "If you haven't trained a model yet, please run 'python train_wb.py' first.\n\n"
+                    "⚠️ *Translation Disclaimer* ⚠️\n\n"
+                    "🔥 Warning: This translator might occasionally confuse 'pasta' with 'post office' due to limited GPU training. 🔥\n"
+                    "Our model was trained on a GPU that was sweating harder than an Italian chef in a hot kitchen! 🍝💦\n"
+                    "If your translation sounds like it was done by a tourist with a phrasebook and three espressos, that's why! 😂\n"
+                    "We promise it's not the algorithm's fault - it's just dreaming of better cooling fans and more VRAM! 🌬️💾"),
+        examples=[
+            ["Hello, how are you today?"],
+            ["I love machine learning and natural language processing."],
+            ["The weather is beautiful today."]
+        ]
+    )
+    
+    # Launch the app
+    demo.launch(share=True)
 
-# Launch the app
 if __name__ == "__main__":
-    demo.launch()
+    main()
